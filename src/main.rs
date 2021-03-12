@@ -14,6 +14,8 @@ use chrono::Utc;
 
 const WIDTH: usize = 256;
 const HEIGHT: usize = 256;
+const WMO: usize = WIDTH - 1;
+const HMO: usize = HEIGHT - 1;
 
 struct Cell {
     pub a: f64,
@@ -25,11 +27,7 @@ impl Clone for Cell {
         Cell{ a: self.a, b: self.b }
     }
 }
-
-fn from_u8_rgb(r: u8, g: u8, b: u8) -> u32 {
-    let (r, g, b) = (r as u32, g as u32, b as u32);
-    (r << 16) | (g << 8) | b
-}
+impl Copy for Cell { }
 
 fn from_f64_rgb(r: f64, g: f64, b: f64) -> u32 {
     (((r * 255.0) as u32) << 16) | (((g * 255.0) as u32) << 8) | ((b * 255.0) as u32)
@@ -47,8 +45,8 @@ struct SimulationState {
     pub  adj: f64,
     pub diag: f64,
     
-    pub curGrid: Vec<Cell>,
-    pub nexGrid: Vec<Cell>,
+    pub curGrid: [Cell; WIDTH * HEIGHT],
+    pub nexGrid: [Cell; WIDTH * HEIGHT],
 }
 
 fn initGif() -> Encoder<File> {
@@ -60,26 +58,34 @@ fn initGif() -> Encoder<File> {
     encoder
 }
 
-fn seedGrid(grid: &mut Vec<Cell>) {
+fn seedGrid(grid: &mut [Cell]) {
     let mut rng = oorandom::Rand64::new(4);
     let lo = (WIDTH * 4) as u64;
     let hi = ((WIDTH * HEIGHT) as u64) - lo;
     
-    for i in 0..64 {
+    // random set of '+' seeds
+    /*for i in 0..64 {
         let p = rng.rand_range(lo..hi) as usize;
         grid[p-1].b = 1.0;
         grid[p].b = 1.0;
         grid[p+1].b = 1.0;
         grid[p-WIDTH].b = 1.0;
         grid[p+WIDTH].b = 1.0;
-    }
+    }*/
     
+    // block in center
     /*for i in 120..135 {
         for j in 120..135 {
             grid[((j * WIDTH) + i) as usize].b = 1.0;
             //println!("{}, {}", i, j);
         }
     }*/
+    
+    // four corners?
+    grid[0].b = 1.0;
+    grid[WMO].b = 1.0;
+    grid[(HEIGHT - 1) * WIDTH].b = 1.0;
+    grid[(HEIGHT * WIDTH) - 1].b = 1.0;
 }
 
 fn main() {
@@ -91,13 +97,13 @@ fn main() {
         adj: 0.2,
         diag: 0.05,
         
-        curGrid: vec![Cell{a: 1.0, b: 0.0,}; WIDTH * HEIGHT],
-        nexGrid: vec![Cell{a: 1.0, b: 0.0,}; WIDTH * HEIGHT],
+        curGrid: [Cell{a: 1.0, b: 0.0,}; WIDTH * HEIGHT],
+        nexGrid: [Cell{a: 1.0, b: 0.0,}; WIDTH * HEIGHT],
     };
     let mut buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
     let mut gifbuf: Vec<u8> = vec![0; WIDTH * HEIGHT * 3];
     let mut window = Window::new("Test", WIDTH, HEIGHT, WindowOptions::default()).unwrap_or_else(|e| { panic!("{}", e); });
-    let mut encoder = initGif();
+    //let mut encoder = initGif();
     
     seedGrid(&mut sim.curGrid);
     
@@ -114,7 +120,7 @@ fn main() {
         
         window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
         
-        if counter == 31 {
+        if counter == 63 {
             //encoder.write_frame(&Frame::from_rgb_speed(WIDTH as u16, HEIGHT as u16, &gifbuf, 30)).unwrap();
             counter = 0;
             total += 1;
@@ -136,45 +142,43 @@ fn update(sim: &mut SimulationState, buf: &mut Vec<u32>, gif: &mut Vec<u8>) {
         
         let col = clamp(0.0, (n.a + n.b) * (n.a - n.b) * 3f64, 1.0);
         buf[i] = from_f64_rgb_gray(col);
-        gif[(i * 3)    ] = (col * 255.0) as u8;
-        gif[(i * 3) + 1] = (col * 255.0) as u8;
-        gif[(i * 3) + 2] = (col * 255.0) as u8;
+        //gif[(i * 3)    ] = (col * 255.0) as u8;
+        //gif[(i * 3) + 1] = (col * 255.0) as u8;
+        //gif[(i * 3) + 2] = (col * 255.0) as u8;
     }
     
     swap(&mut sim.curGrid, &mut sim.nexGrid);
 }
 
-fn laplacian(grid: &Vec<Cell>, i: usize, adj: f64, diag: f64) -> (f64, f64) {
+fn laplacian(grid: &[Cell], i: usize, adj: f64, diag: f64) -> (f64, f64) {
     let x = i % WIDTH;
     let y = i / WIDTH;
-    let wmo = WIDTH - 1;
-    let hmo = HEIGHT - 1;
     
     /* --------------- */
     let mut l = i;
     if x == 0 {
-        l += wmo;
+        l += WMO;
     } else {
         l -= 1;
     }
     
     let mut r = i;
-    if x == wmo {
-        r -= wmo;
+    if x == WMO {
+        r -= WMO;
     } else {
         r += 1;
     }
     
     let mut u = i;
     if y == 0 {
-        u += wmo * HEIGHT;
+        u += WMO * HEIGHT;
     } else {
         u -= WIDTH;
     }
     
     let mut d = i;
-    if y == hmo {
-        d -= hmo * WIDTH;
+    if y == HMO {
+        d -= HMO * WIDTH;
     } else {
         d += WIDTH;
     }
@@ -183,28 +187,28 @@ fn laplacian(grid: &Vec<Cell>, i: usize, adj: f64, diag: f64) -> (f64, f64) {
     
     let mut lu = u;
     if x == 0 {
-        lu += wmo;
+        lu += WMO;
     } else {
         lu -= 1;
     }
     
     let mut ru = u;
-    if x == wmo {
-        ru -= wmo;
+    if x == WMO {
+        ru -= WMO;
     } else {
         ru += 1;
     }
     
     let mut ld = d;
     if x == 0 {
-        ld += wmo;
+        ld += WMO;
     } else {
         ld -= 1;
     }
     
     let mut rd = d;
-    if x == wmo {
-        rd -= wmo;
+    if x == WMO {
+        rd -= WMO;
     } else {
         rd += 1;
     }
