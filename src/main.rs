@@ -100,8 +100,8 @@ fn main() {
         curGrid: [Cell{a: 1.0, b: 0.0,}; WIDTH * HEIGHT],
         nexGrid: [Cell{a: 1.0, b: 0.0,}; WIDTH * HEIGHT],
     };
-    let mut buffer: Vec<u32> = vec![0; WIDTH * HEIGHT];
-    let mut gifbuf: Vec<u8> = vec![0; WIDTH * HEIGHT * 3];
+    let mut buffer: [u32; WIDTH * HEIGHT] = [0; WIDTH * HEIGHT];
+    let mut gifbuf: [u8; WIDTH * HEIGHT * 3] = [0; WIDTH * HEIGHT * 3];
     let mut window = Window::new("Test", WIDTH, HEIGHT, WindowOptions::default()).unwrap_or_else(|e| { panic!("{}", e); });
     //let mut encoder = initGif();
     
@@ -131,7 +131,7 @@ fn main() {
     }
 }
 
-fn update(sim: &mut SimulationState, buf: &mut Vec<u32>, gif: &mut Vec<u8>) {
+fn update(sim: &mut SimulationState, buf: &mut [u32], gif: &mut [u8]) {
     for (i, c) in &mut sim.curGrid.iter().enumerate() {
         let n = &mut sim.nexGrid[i];
         let abb = c.a * c.b * c.b;
