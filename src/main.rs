@@ -11,7 +11,6 @@ use oorandom;
 use gif::{Encoder, Repeat, Frame};
 use std::fs::File;
 use chrono::Utc;
-use ::f128::*;
 
 const WIDTH: usize = 256;
 const HEIGHT: usize = 256;
@@ -19,8 +18,8 @@ const WMO: usize = WIDTH - 1;
 const HMO: usize = HEIGHT - 1;
 
 struct Cell {
-    pub a: f128,
-    pub b: f128,
+    pub a: f64,
+    pub b: f64,
 }
 
 impl Clone for Cell {
@@ -39,12 +38,12 @@ fn from_f64_rgb_gray(v: f64) -> u32 {
 }
 
 struct SimulationState {
-    pub   dA: f128,
-    pub   dB: f128,
-    pub    f: f128,
-    pub    k: f128,
-    pub  adj: f128,
-    pub diag: f128,
+    pub   dA: f64,
+    pub   dB: f64,
+    pub    f: f64,
+    pub    k: f64,
+    pub  adj: f64,
+    pub diag: f64,
     
     pub curGrid: Vec<Cell>,
     pub nexGrid: Vec<Cell>,
@@ -60,46 +59,46 @@ fn initGif() -> Encoder<File> {
 }
 
 fn seedGrid(grid: &mut [Cell]) {
-    let mut rng = oorandom::Rand64::new(4);
+    let mut rng = oorandom::Rand64::new(5);
     let lo = (WIDTH * 4) as u64;
     let hi = ((WIDTH * HEIGHT) as u64) - lo;
     
     // random set of '+' seeds
-    /*for i in 0..64 {
+    for i in 0..64 {
         let p = rng.rand_range(lo..hi) as usize;
         grid[p-1].b = 1.0;
         grid[p].b = 1.0;
         grid[p+1].b = 1.0;
         grid[p-WIDTH].b = 1.0;
         grid[p+WIDTH].b = 1.0;
-    }*/
-    
-    // block in center
-    for i in 127..129 {
-        for j in 127..129 {
-            grid[((j * WIDTH) + i) as usize].b = f128::ONE;
-            //println!("{}, {}", i, j);
-        }
     }
     
+    // block in center
+    /*for i in 127..129 {
+        for j in 127..129 {
+            grid[((j * WIDTH) + i) as usize].b = 1.0;
+            //println!("{}, {}", i, j);
+        }
+    }*/
+    
     // four corners?
-    //grid[0].b = f128::ONE;
-    //grid[WMO].b = f128::ONE;
-    //grid[(HEIGHT - 1) * WIDTH].b = f128::ONE;
-    //grid[(HEIGHT * WIDTH) - 1].b = f128::ONE;
+    /*grid[0].b = 1.0;
+    grid[WMO].b = 1.0;
+    grid[(HEIGHT - 1) * WIDTH].b = 1.0;
+    grid[(HEIGHT * WIDTH) - 1].b = 1.0;*/
 }
 
 fn main() {
     let mut sim = SimulationState {
-        dA: f128::ONE,
-        dB: f128!(0.5),
-        f: f128!(0.055),
-        k: f128!(0.062),
-        adj: f128!(0.2),
-        diag: f128!(0.05),
+        dA: 1.0,
+        dB: 0.5,
+        f: 0.0250,
+        k: 0.0550,
+        adj: 0.2,
+        diag: 0.05,
         
-        curGrid: vec![Cell{a: f128!(1.0), b: f128!(0.0),}; WIDTH * HEIGHT],
-        nexGrid: vec![Cell{a: f128!(1.0), b: f128!(0.0),}; WIDTH * HEIGHT],
+        curGrid: vec![Cell{a: 1.0, b: 0.0,}; WIDTH * HEIGHT],
+        nexGrid: vec![Cell{a: 1.0, b: 0.0,}; WIDTH * HEIGHT],
     };
     let mut buffer: [u32; WIDTH * HEIGHT] = [0; WIDTH * HEIGHT];
     let mut gifbuf: [u8; WIDTH * HEIGHT * 3] = [0; WIDTH * HEIGHT * 3];
@@ -109,7 +108,7 @@ fn main() {
     seedGrid(&mut sim.curGrid);
     
     /* MAIN LOOP */
-    let mut counter = 0;
+    let mut counter = -350;
     let mut total = 0;
     let mut lastTime = Instant::now();
     while window.is_open() && !window.is_key_down(Key::Escape) {
@@ -121,7 +120,7 @@ fn main() {
         
         window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
         
-        /*if counter == 7 {
+        /*if counter == 6 {
             encoder.write_frame(&Frame::from_rgb_speed(WIDTH as u16, HEIGHT as u16, &gifbuf, 30)).unwrap();
             counter = 0;
             total += 1;
@@ -138,26 +137,27 @@ fn update(sim: &mut SimulationState, buf: &mut [u32], gif: &mut [u8]) {
         let abb = c.a * c.b * c.b;
         let (lapA, lapB) = laplacian(&sim.curGrid, i, sim.adj, sim.diag);
         
-        n.a = clamp(f128!(0.0), c.a + (sim.dA * lapA) - abb + (sim.f * (f128!(1.0) - c.a)), f128!(1.0));
-        n.b = clamp(f128!(0.0), c.b + (sim.dB * lapB) + abb - ((sim.k + sim.f) * c.b), f128!(1.0));
+        n.a = clamp(0.0, c.a + (sim.dA * lapA) - abb + (sim.f * (1.0 - c.a)), 1.0);
+        n.b = clamp(0.0, c.b + (sim.dB * lapB) + abb - ((sim.k + sim.f) * c.b), 1.0);
         
-        let mut col = (n.a + n.b) * (n.a - n.b) * f128!(3.0);
-        if col < f128!(0.0) {
-            col = f128!(0.0);
-        } else if col > f128!(1.0) {
-            col = f128!(1.0);
+        let val = clamp(0.0, (n.a + n.b) * (n.a - n.b) * 8f64, 1.0);
+        let mut r = 1.0 - (val * 0.5f64);
+        let mut g = 1.0 - (val * 0.1f64);
+        let mut b = 1.0 - (val * 0.6f64);
+        if val > 0.8f64 {
+            b *= 1.7f64;
         }
         
-        buf[i] = from_f64_rgb_gray(col.into());
-        //gif[(i * 3)    ] = (col * 255.0) as u8;
-        //gif[(i * 3) + 1] = (col * 255.0) as u8;
-        //gif[(i * 3) + 2] = (col * 255.0) as u8;
+        buf[i] = from_f64_rgb(r, g, b);
+        //gif[(i * 3)    ] = (r * 255.0) as u8;
+        //gif[(i * 3) + 1] = (g * 255.0) as u8;
+        //gif[(i * 3) + 2] = (b * 255.0) as u8;
     }
     
     swap(&mut sim.curGrid, &mut sim.nexGrid);
 }
 
-fn laplacian(grid: &[Cell], i: usize, adj: f128, diag: f128) -> (f128, f128) {
+fn laplacian(grid: &[Cell], i: usize, adj: f64, diag: f64) -> (f64, f64) {
     let x = i % WIDTH;
     let y = i / WIDTH;
     
