@@ -1,4 +1,6 @@
+
 extern crate minifb;
+extern crate threadpool;
 
 use minifb::{Key, Window, WindowOptions, ScaleMode, Scale};
 use crate::sim::Simulation;
@@ -26,9 +28,9 @@ fn main() {
     
     let mut sim = Simulation::new(
         1.0,    // dA
-        0.5,    // dB
-        0.0150, // f
-        0.0550, // k
+        0.3,    // dB
+        0.0500, // f
+        0.0625, // k
         0.2,    // adj
         0.05,   // diag
         
@@ -47,20 +49,20 @@ fn main() {
         transparency: false,
         none: false
     }).unwrap();
-    window.limit_update_rate(Some(Duration::from_nanos(1)));
+    window.limit_update_rate(None);
     
-    //let mut last_time = Instant::now();
+    let mut last_time = Instant::now();
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        /*let time = Instant::now().duration_since(last_time).as_secs_f64();
+        let time = Instant::now().duration_since(last_time).as_secs_f64();
         println!("{:?}, {:?}", time, 1.0 / time);
-        last_time = Instant::now();*/
+        last_time = Instant::now();
         
         if window.is_key_down(Key::G) {
             sim.generation();
         }
         
         if !window.is_key_down(Key::Space) {
-            window.update_with_buffer(&sim.framebuffer, width, height).unwrap();
+            window.update_with_buffer(&sim.framebuffer.get(), width, height).unwrap();
         } else {
             window.update();
         }
